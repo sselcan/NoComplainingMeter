@@ -1,0 +1,456 @@
+<style>
+  :root {
+    --board: #4A2270; --board-hi: #7C40A6;
+    --enamel: #FFF7EF; --enamel-2: #F4DBC3;
+    --hazard: #FFD645; --ink: #2B1240; --alarm: #E8502E; --flash: #FF8FB1;
+    --mint: #19C6A6; --muted: #9A7C93;
+    --display: "Haettenschweiler", "Arial Narrow", "Impact", "Franklin Gothic Bold", sans-serif;
+    --mono: "SFMono-Regular", "Menlo", "Consolas", "Roboto Mono", monospace;
+    --body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #FCDEC1; }
+  .wrap { font-family: var(--body); color: var(--ink); max-width: 780px; margin: 0 auto; padding: 16px 8px; }
+
+  .board { position: relative; background: var(--board);
+    background-image: radial-gradient(circle at 30% 0%, var(--board-hi), var(--board) 70%);
+    border-radius: 3px; overflow: hidden;
+    box-shadow: 0 2px 0 rgba(0,0,0,.35), inset 0 0 0 3px rgba(255,255,255,.06); }
+  .stripe { height: 14px; background: repeating-linear-gradient(45deg, var(--alarm) 0 14px, var(--hazard) 14px 28px); }
+  .board-inner { padding: 26px 20px 22px; text-align: center; position: relative; }
+  .rivet { position: absolute; width: 9px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #FFF3C4, #FFD645 55%, #B98A0C); }
+  .rivet.tl { top: 24px; left: 18px; } .rivet.tr { top: 24px; right: 18px; }
+  .rivet.bl { bottom: 20px; left: 18px; } .rivet.br { bottom: 20px; right: 18px; }
+
+  .eyebrow { font-family: var(--display); color: var(--enamel); letter-spacing: .14em;
+    font-size: clamp(11px, 2.6vw, 15px); margin: 0; text-transform: uppercase; opacity: .85; }
+  .ticker { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700;
+    color: var(--hazard); font-size: clamp(38px, 12vw, 78px); line-height: 1.05; margin: 10px 0 8px;
+    text-shadow: 0 0 30px rgba(255,214,69,.4); }
+  .ticker.reset { color: var(--flash); text-shadow: 0 0 30px rgba(255,143,177,.5); }
+  @media (prefers-reduced-motion: no-preference) { .ticker.reset { animation: pulse 1.1s ease-out 3; } }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  .record { font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+    color: rgba(255,247,239,.66); margin-top: 16px; text-transform: uppercase; }
+
+  .lock { display: flex; gap: 8px; align-items: center; justify-content: center;
+    margin: 12px 0; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .lock input { flex: 0 1 190px; }
+
+  input { font-family: var(--body); font-size: 14px; padding: 11px 12px;
+    border: 2px solid var(--enamel-2); background: var(--enamel); border-radius: 2px; color: var(--ink); min-width: 0; }
+  input:focus { outline: 3px solid var(--mint); outline-offset: 1px; border-color: var(--board); }
+
+  .clock-in { display: flex; align-items: center; gap: 1px; flex: 0 0 auto;
+    border: 2px solid var(--enamel-2); background: var(--enamel); border-radius: 2px; padding: 0 10px; }
+  .clock-in:focus-within { outline: 3px solid var(--mint); outline-offset: 1px; border-color: var(--board); }
+  .clock-in input { width: 26px; border: 0; padding: 11px 0; background: transparent;
+    text-align: center; font-family: var(--mono); font-size: 16px; font-weight: 700; letter-spacing: .04em; }
+  .clock-in input:focus { outline: 0; }
+  .clock-in span { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--muted); }
+
+  button { font-family: var(--display); letter-spacing: .1em; text-transform: uppercase; font-size: 15px;
+    padding: 12px 22px; border: 0; border-radius: 2px; background: var(--alarm); color: #fff;
+    cursor: pointer; box-shadow: 0 3px 0 #A03418; }
+  button.dark { background: var(--board); box-shadow: 0 3px 0 #2B1240; }
+  button:hover:not(:disabled) { filter: brightness(1.12); }
+  button:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+  button:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
+  button:disabled { background: var(--enamel-2); color: var(--muted); box-shadow: 0 3px 0 #E0C3A6; cursor: default; }
+  button.ghost { background: transparent; color: var(--muted); box-shadow: none; font-family: var(--body);
+    text-transform: none; letter-spacing: 0; font-size: 12px; padding: 6px 8px; text-decoration: underline; }
+
+  .panel { background: var(--enamel); border: 2px solid var(--enamel-2); border-radius: 2px;
+    padding: 16px 18px; margin-bottom: 12px; }
+  .panel h2 { font-family: var(--display); text-transform: uppercase; letter-spacing: .14em; font-size: 13px;
+    margin: 0 0 14px; color: var(--muted); display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .row input { flex: 1 1 200px; }
+  .row input.date { flex: 0 1 160px; font-family: var(--mono); }
+
+  .clock-strip { position: relative; height: 44px; margin: 4px 0 14px; }
+  .clock-line { position: absolute; top: 20px; left: 0; right: 0; height: 2px; background: var(--enamel-2); }
+  .dot { position: absolute; top: 15px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
+    background: var(--mint); border: 2px solid var(--enamel); }
+  .tick { position: absolute; top: 28px; font-family: var(--mono); font-size: 10px; color: var(--muted); transform: translateX(-50%); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 9px 6px; border-top: 1px solid var(--enamel-2); vertical-align: top; }
+  tr:first-child td { border-top: 0; }
+  .t-date { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .t-time { font-family: var(--mono); font-weight: 700; white-space: nowrap; color: var(--board); }
+  .t-note { color: var(--muted); width: 99%; }
+  .t-len { font-family: var(--mono); font-size: 12px; text-align: right; white-space: nowrap; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 14px;
+    border-top: 1px solid var(--enamel-2); padding-top: 14px; }
+  .stat b { display: block; font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--board); }
+  .stat span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+
+  .empty { color: var(--muted); font-size: 14px; margin: 0; }
+  .foot { font-size: 11px; color: var(--muted); text-align: center; margin: 14px 0 4px; }
+  .msg { font-size: 13px; padding: 10px 14px; border-radius: 2px; margin: 0 0 12px; }
+  .msg.bad { background: var(--alarm); color: #fff; }
+  .msg.ok { background: var(--mint); color: #06342B; }
+</style>
+
+<div class="wrap">
+  <div class="board">
+    <div class="stripe"></div>
+    <div class="board-inner">
+      <span class="rivet tl"></span><span class="rivet tr"></span>
+      <span class="rivet bl"></span><span class="rivet br"></span>
+      <p class="eyebrow">This department has gone</p>
+      <div class="ticker" id="ticker">loading</div>
+      <p class="eyebrow">without complaining</p>
+      <div class="record" id="record">&nbsp;</div>
+    </div>
+    <div class="stripe"></div>
+  </div>
+
+  <div class="lock">
+    <label for="pw">Board password</label>
+    <input type="password" id="pw" placeholder="required to add anything" autocomplete="current-password">
+  </div>
+
+  <p class="msg" id="msg" hidden></p>
+
+  <div class="panel">
+    <h2><span>The counter</span><span id="reset-count"></span></h2>
+    <div class="row">
+      <div class="clock-in">
+        <input id="ihh" inputmode="numeric" maxlength="2" placeholder="HH" aria-label="Hour it happened">
+        <span>:</span>
+        <input id="imm" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minute it happened">
+      </div>
+      <input type="text" id="inote" placeholder="What happened (optional)" maxlength="90" autocomplete="off">
+      <button id="resetbtn" class="dark">Reset the counter</button>
+    </div>
+    <div id="resetlog"></div>
+  </div>
+
+  <div class="panel">
+    <h2><span>First complaint of the day</span><span id="count-label"></span></h2>
+    <div class="row">
+      <input type="date" id="cdate" class="date" aria-label="Day">
+      <div class="clock-in">
+        <input id="chh" inputmode="numeric" maxlength="2" placeholder="HH" aria-label="Hour of the first complaint">
+        <span>:</span>
+        <input id="cmm" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minute of the first complaint">
+      </div>
+      <input type="text" id="cnote" placeholder="What set it off (optional)" maxlength="90" autocomplete="off">
+      <button id="logbtn">Log it</button>
+    </div>
+    <div class="clock-strip" id="strip"></div>
+    <div id="logbody"></div>
+    <div class="stats" id="stats"></div>
+    <div style="text-align:center"><button class="ghost" id="undo" hidden>Remove today's entry</button></div>
+  </div>
+
+  <p class="foot" id="mode"></p>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG. Fill these in to run the board outside Claude, for example on
+   GitHub Pages. Leave them empty to use Claude artifact storage instead.
+   The real password lives in the database, not here. See SETUP.md.
+   ===================================================================== */
+const CONFIG = {
+  supabaseUrl: 'shjyzdddamtrmjjtkeuu.supabase.co',        // https://YOURPROJECT.supabase.co
+  supabaseKey: 'sb_publishable_LGdcZQSnfugvjX06Yz3pnQ_M7tt0jsj',        // the public anon key
+  board: 'office',
+};
+
+const CLAUDE_KEY = 'office-board-v2';
+
+/* ---------- backends ---------- */
+const supa = {
+  label: 'shared through Supabase',
+  available: () => !!(CONFIG.supabaseUrl && CONFIG.supabaseKey),
+  head: () => ({ apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'Content-Type': 'application/json' }),
+  root: () => CONFIG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1',
+  async load() {
+    const q = '/events?board=eq.' + encodeURIComponent(CONFIG.board) + '&select=id,kind,day,ts,note&order=ts.asc';
+    const r = await fetch(supa.root() + q, { headers: supa.head() });
+    if (!r.ok) throw new Error('read ' + r.status);
+    return (await r.json()).map(x => ({ id: x.id, kind: x.kind, ts: new Date(x.ts).getTime(), note: x.note || '' }));
+  },
+  async rpc(name, args) {
+    const r = await fetch(supa.root() + '/rpc/' + name, { method: 'POST', headers: supa.head(), body: JSON.stringify(args) });
+    if (r.ok) return;
+    const text = (await r.text()).toLowerCase();
+    if (text.indexOf('wrong password') > -1) throw new Error('BADPW');
+    if (text.indexOf('duplicate') > -1 || text.indexOf('unique') > -1) throw new Error('DUPLICATE');
+    throw new Error('SAVE');
+  },
+  async add(e, pw) {
+    await supa.rpc('add_event', { p_board: CONFIG.board, p_kind: e.kind, p_day: dayKey(e.ts),
+      p_ts: new Date(e.ts).toISOString(), p_note: e.note, p_secret: pw });
+  },
+  async removeComplaint(day, pw) {
+    await supa.rpc('remove_complaint', { p_board: CONFIG.board, p_day: day, p_secret: pw });
+  }
+};
+
+const claude = {
+  label: 'shared through this Claude artifact',
+  available: () => typeof window.storage !== 'undefined',
+  async raw() {
+    try {
+      const r = await window.storage.get(CLAUDE_KEY, true);
+      if (r && r.value) { const p = JSON.parse(r.value); if (Array.isArray(p.entries)) return p.entries; }
+    } catch (e) {}
+    return [];
+  },
+  load() { return claude.raw(); },
+  async add(e, pw) {
+    if (pw !== CONFIG.demoPassword) throw new Error('BADPW');
+    const list = await claude.raw();
+    if (e.kind === 'complaint' && list.some(x => x.kind === 'complaint' && dayKey(x.ts) === dayKey(e.ts))) throw new Error('DUPLICATE');
+    list.push(e);
+    await window.storage.set(CLAUDE_KEY, JSON.stringify({ entries: list }), true);
+  },
+  async removeComplaint(day, pw) {
+    if (pw !== CONFIG.demoPassword) throw new Error('BADPW');
+    const list = (await claude.raw()).filter(x => !(x.kind === 'complaint' && dayKey(x.ts) === day));
+    await window.storage.set(CLAUDE_KEY, JSON.stringify({ entries: list }), true);
+  }
+};
+
+const store = supa.available() ? supa : (claude.available() ? claude : null);
+
+/* ---------- helpers ---------- */
+let events = [], undoArmed = false, justReset = false;
+const $ = id => document.getElementById(id);
+const dayKey = ts => { const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const clockOf = ts => { const d = new Date(ts);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+const minsOf = ts => { const d = new Date(ts); return d.getHours() * 60 + d.getMinutes(); };
+const fmtMins = m => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(Math.round(m) % 60).padStart(2, '0');
+const kind = k => events.filter(e => e.kind === k).sort((a, b) => a.ts - b.ts);
+const complaints = () => kind('complaint');
+const incidents = () => kind('incident');
+const pad = n => String(n).padStart(2, '0');
+const selectedDay = () => $('cdate').value || dayKey(Date.now());
+const complaintOn = day => complaints().find(e => dayKey(e.ts) === day);
+function buildTs(dateStr, timeVal) {
+  const p = dateStr.split('-').map(Number), q = (timeVal || '00:00').split(':').map(Number);
+  return new Date(p[0], p[1] - 1, p[2], q[0], q[1], 0, 0).getTime();
+}
+function resetFields() {
+  const now = new Date();
+  $('cdate').value = dayKey(now.getTime());
+  $('chh').value = pad(now.getHours()); $('cmm').value = pad(now.getMinutes());
+  $('ihh').value = pad(now.getHours()); $('imm').value = pad(now.getMinutes());
+}
+function readClock(hId, mId) {
+  const h = parseInt($(hId).value, 10), m = parseInt($(mId).value, 10);
+  if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return pad(h) + ':' + pad(m);
+}
+function wireClock(hId, mId, onEnter) {
+  const h = $(hId), m = $(mId);
+  [h, m].forEach(el => {
+    el.addEventListener('input', () => {
+      el.value = el.value.replace(/[^0-9]/g, '').slice(0, 2);
+      if (el === h && (el.value.length === 2 || +el.value > 2)) { m.focus(); m.select(); }
+    });
+    el.addEventListener('focus', () => el.select());
+    el.addEventListener('blur', () => {
+      const max = el === h ? 23 : 59;
+      let v = parseInt(el.value, 10);
+      if (isNaN(v)) { el.value = ''; return; }
+      el.value = pad(Math.max(0, Math.min(max, v)));
+    });
+    el.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') { onEnter(); return; }
+      if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
+        ev.preventDefault();
+        const max = el === h ? 23 : 59, step = ev.key === 'ArrowUp' ? 1 : -1;
+        el.value = pad((((parseInt(el.value, 10) || 0) + step) % (max + 1) + max + 1) % (max + 1));
+      }
+      if (ev.key === 'Backspace' && el === m && !el.value) { h.focus(); }
+    });
+  });
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function duration(ms) {
+  if (ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000), d = Math.floor(s / 86400);
+  return (d ? d + 'd ' : '') + String(Math.floor(s % 86400 / 3600)).padStart(2, '0') + ':' +
+    String(Math.floor(s % 3600 / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+function durationShort(ms) {
+  const s = Math.floor(ms / 1000), d = Math.floor(s / 86400),
+        h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? d + 'd ' + h + 'h' : (h ? h + 'h ' + m + 'm' : m + 'm');
+}
+function say(text, good) {
+  const el = $('msg'); el.hidden = !text; el.textContent = text || '';
+  el.className = 'msg ' + (good ? 'ok' : 'bad');
+  if (text) setTimeout(() => { el.hidden = true; }, 5000);
+}
+function password() {
+  const pw = $('pw').value.trim();
+  if (!pw) { say('Enter the board password first.'); $('pw').focus(); return null; }
+  return pw;
+}
+function handle(err) {
+  if (err.message === 'BADPW') { say('Wrong password. Nothing was saved.'); $('pw').value = ''; $('pw').focus(); }
+  else if (err.message === 'DUPLICATE') say('Today is already on the board.');
+  else say('That did not save. Check your connection and try again.');
+}
+
+/* ---------- actions ---------- */
+async function refresh() {
+  if (!store) return;
+  try { events = await store.load(); } catch (e) { say('Cannot reach the board data. Showing the last version loaded.'); }
+}
+
+async function addEvent(k, noteField, ts) {
+  const pw = password(); if (!pw || !store) return;
+  if (!ts || isNaN(ts)) { say('Pick a valid time first.'); return; }
+  if (ts > Date.now() + 60000) { say('That time has not happened yet.'); return; }
+  const e = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), kind: k, ts: ts, note: $(noteField).value.trim() };
+  try {
+    await store.add(e, pw);
+    try { sessionStorage.setItem('board-pw', pw); } catch (err) {}
+    $(noteField).value = '';
+    resetFields();
+    if (k === 'incident') { justReset = true; setTimeout(() => { justReset = false; render(); }, 3500); }
+    say(k === 'incident' ? 'Counter reset. Back to zero.' : 'Logged.', true);
+  } catch (err) { handle(err); }
+  await refresh(); render();
+}
+
+async function removeSelected() {
+  const pw = password(); if (!pw || !store) return;
+  try { await store.removeComplaint(selectedDay(), pw); say('Removed.', true); } catch (err) { handle(err); }
+  undoArmed = false; await refresh(); render();
+}
+
+/* ---------- render ---------- */
+function renderTicker() {
+  const list = incidents(), t = $('ticker');
+  if (!list.length) { t.textContent = '--:--:--'; t.classList.remove('reset');
+    $('record').textContent = 'counter has never been reset'; return; }
+  const last = list[list.length - 1];
+  t.textContent = duration(Date.now() - last.ts);
+  t.classList.toggle('reset', justReset);
+  const gaps = [];
+  for (let i = 1; i < list.length; i++) gaps.push(list[i].ts - list[i - 1].ts);
+  gaps.push(Date.now() - last.ts);
+  $('record').textContent = 'record ' + durationShort(Math.max.apply(null, gaps)) +
+    '  \u00b7  last reset ' + new Date(last.ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' at ' + clockOf(last.ts);
+}
+
+function renderResets() {
+  const list = incidents(), body = $('resetlog');
+  $('reset-count').textContent = list.length ? list.length + ' reset' + (list.length === 1 ? '' : 's') : '';
+  if (!list.length) { body.innerHTML = '<p class="empty">Never reset. Enjoy it while it lasts.</p>'; return; }
+  const rows = list.map((e, i) => ({ e, len: i ? e.ts - list[i - 1].ts : null })).reverse().slice(0, 12);
+  body.innerHTML = '<table>' + rows.map(r => {
+    const date = new Date(r.e.ts).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    return '<tr><td class="t-date">' + date + '</td><td class="t-time">' + clockOf(r.e.ts) +
+      '</td><td class="t-note">' + (r.e.note ? esc(r.e.note) : '') +
+      '</td><td class="t-len">' + (r.len ? 'ran ' + durationShort(r.len) : 'first') + '</td></tr>';
+  }).join('') + '</table>';
+}
+
+function renderStrip() {
+  const list = complaints().slice(-30), strip = $('strip');
+  let A = 7, B = 19;
+  list.forEach(e => { const h = minsOf(e.ts) / 60;
+    A = Math.min(A, Math.floor(h)); B = Math.max(B, Math.ceil(h)); });
+  strip.innerHTML = '<div class="clock-line"></div>';
+  const step = (B - A) > 14 ? 4 : 3;
+  for (let h = A; h <= B; h += step) {
+    const el = document.createElement('div');
+    el.className = 'tick'; el.style.left = ((h - A) / (B - A) * 100) + '%';
+    el.textContent = String(h).padStart(2, '0') + ':00';
+    strip.appendChild(el);
+  }
+  list.forEach((e, i) => {
+    const pct = Math.max(0, Math.min(1, (minsOf(e.ts) / 60 - A) / (B - A)));
+    const d = document.createElement('div');
+    d.className = 'dot'; d.style.left = (pct * 100) + '%';
+    d.style.opacity = 0.35 + 0.65 * (i + 1) / list.length;
+    d.title = clockOf(e.ts);
+    strip.appendChild(d);
+  });
+}
+
+function renderComplaints() {
+  const list = complaints().slice().reverse(), body = $('logbody');
+  $('count-label').textContent = list.length ? list.length + ' day' + (list.length === 1 ? '' : 's') : '';
+  if (!list.length) { body.innerHTML = '<p class="empty">Nothing logged yet.</p>'; $('stats').innerHTML = ''; return; }
+  body.innerHTML = '<table>' + list.slice(0, 40).map(e => {
+    const date = new Date(e.ts).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    return '<tr><td class="t-date">' + date + '</td><td class="t-time">' + clockOf(e.ts) +
+      '</td><td class="t-note">' + (e.note ? esc(e.note) : '') + '</td></tr>';
+  }).join('') + '</table>';
+
+  const asc = complaints(), mins = asc.map(e => minsOf(e.ts));
+  const avg = mins.reduce((a, b) => a + b, 0) / mins.length;
+  const early = asc[mins.indexOf(Math.min.apply(null, mins))];
+  const late = asc[mins.indexOf(Math.max.apply(null, mins))];
+  const span = Math.max(1, Math.round((asc[asc.length - 1].ts - asc[0].ts) / 86400000) + 1);
+  $('stats').innerHTML = [[fmtMins(avg), 'average'], [clockOf(early.ts), 'earliest'],
+    [clockOf(late.ts), 'latest'], [asc.length + '/' + span, 'days logged / running']]
+    .map(c => '<div class="stat"><b>' + c[0] + '</b><span>' + c[1] + '</span></div>').join('');
+}
+
+function renderControls() {
+  const day = selectedDay(), t = complaintOn(day), btn = $('logbtn');
+  btn.disabled = !!t || !store;
+  btn.textContent = t ? 'Already logged, ' + clockOf(t.ts) : 'Log it';
+  $('resetbtn').disabled = !store;
+  const undo = $('undo');
+  undo.hidden = !t;
+  const label = day === dayKey(Date.now()) ? 'today\u2019s entry'
+    : 'the entry for ' + new Date(buildTs(day, '12:00')).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  undo.textContent = undoArmed ? 'Click again to remove it' : 'Remove ' + label;
+}
+
+function render() { renderTicker(); renderResets(); renderStrip(); renderComplaints(); renderControls(); }
+
+/* ---------- wiring ---------- */
+function logComplaint() {
+  const t = readClock('chh', 'cmm');
+  if (!t) { say('Enter an hour between 00 and 23 and a minute between 00 and 59.'); $('chh').focus(); return; }
+  addEvent('complaint', 'cnote', buildTs(selectedDay(), t));
+}
+function logIncident() {
+  const t = readClock('ihh', 'imm');
+  if (!t) { say('Enter an hour between 00 and 23 and a minute between 00 and 59.'); $('ihh').focus(); return; }
+  addEvent('incident', 'inote', buildTs(dayKey(Date.now()), t));
+}
+wireClock('chh', 'cmm', () => { if (!$('logbtn').disabled) logComplaint(); });
+wireClock('ihh', 'imm', logIncident);
+
+$('resetbtn').addEventListener('click', logIncident);
+$('logbtn').addEventListener('click', logComplaint);
+$('cnote').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('logbtn').disabled) logComplaint(); });
+$('inote').addEventListener('keydown', e => { if (e.key === 'Enter') logIncident(); });
+$('cdate').addEventListener('change', renderControls);
+$('undo').addEventListener('click', () => {
+  if (!undoArmed) { undoArmed = true; renderControls(); setTimeout(() => { undoArmed = false; renderControls(); }, 4000); }
+  else removeSelected();
+});
+
+(async function init() {
+  resetFields();
+  $('mode').textContent = store
+    ? 'Anyone can watch the board. Only the password adds or removes anything. It is ' + store.label + '.'
+    : 'No shared storage configured. Fill in CONFIG at the top of this file.';
+  if (!store) { say('This copy is not connected to any storage, so nothing will be saved.'); render(); return; }
+  try { const pw = sessionStorage.getItem('board-pw'); if (pw) $('pw').value = pw; } catch (e) {}
+  await refresh(); render();
+  setInterval(renderTicker, 1000);
+  setInterval(async () => { await refresh(); render(); }, 20000);
+})();
+</script>
