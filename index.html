@@ -4,6 +4,7 @@
     --enamel: #FFF7EF; --enamel-2: #F4DBC3;
     --hazard: #FFD645; --ink: #2B1240; --alarm: #E8502E; --flash: #FF8FB1;
     --mint: #19C6A6; --muted: #9A7C93;
+    --band: #EC9A50; --band-deep: #BC7228;
     --display: "Haettenschweiler", "Arial Narrow", "Impact", "Franklin Gothic Bold", sans-serif;
     --mono: "SFMono-Regular", "Menlo", "Consolas", "Roboto Mono", monospace;
     --body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -13,20 +14,20 @@
   .wrap { font-family: var(--body); color: var(--ink); max-width: 780px; margin: 0 auto; padding: 16px 8px; }
 
   .board { position: relative; background: var(--board);
-    background-image: url('calm.jpg');
-    background-size: cover; background-position: center;
     border-radius: 3px; overflow: hidden;
     box-shadow: 0 2px 0 rgba(0,0,0,.35), inset 0 0 0 3px rgba(255,255,255,.06); }
-  .stripe { height: 14px; background: repeating-linear-gradient(45deg, var(--alarm) 0 14px, var(--hazard) 14px 28px); }
-  .board-inner { padding: 26px 20px 22px; text-align: center; position: relative; }
+  .band { background: var(--band); padding: 9px 12px; }
+  .board-inner { aspect-ratio: 21 / 9; background-image: url('calm.jpg');
+    background-size: cover; background-position: center;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; position: relative; }
   .rivet { position: absolute; width: 9px; height: 9px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #FFF3C4, #FFD645 55%, #B98A0C); }
-  .rivet.tl { top: 24px; left: 18px; } .rivet.tr { top: 24px; right: 18px; }
-  .rivet.bl { bottom: 20px; left: 18px; } .rivet.br { bottom: 20px; right: 18px; }
+  .rivet.tl { top: 12px; left: 14px; } .rivet.tr { top: 12px; right: 14px; }
+  .rivet.bl { bottom: 12px; left: 14px; } .rivet.br { bottom: 12px; right: 14px; }
 
-  .eyebrow { font-family: var(--display); color: var(--enamel); letter-spacing: .14em;
-    font-size: clamp(11px, 2.6vw, 15px); margin: 0; text-transform: uppercase; opacity: .85;
-    text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+  .eyebrow { font-family: var(--display); color: var(--ink); letter-spacing: .14em;
+    font-size: clamp(11px, 2.6vw, 15px); margin: 0; text-transform: uppercase; text-align: center; }
   .ticker { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700;
     color: var(--hazard); font-size: clamp(38px, 12vw, 78px); line-height: 1.05; margin: 10px 0 8px;
     text-shadow: 0 2px 8px rgba(43,18,64,.75), 0 0 30px rgba(255,214,69,.4); }
@@ -55,9 +56,8 @@
   .clock-in span { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--muted); }
 
   button { font-family: var(--display); letter-spacing: .1em; text-transform: uppercase; font-size: 15px;
-    padding: 12px 22px; border: 0; border-radius: 2px; background: var(--alarm); color: #fff;
-    cursor: pointer; box-shadow: 0 3px 0 #A03418; }
-  button.dark { background: var(--board); box-shadow: 0 3px 0 #2B1240; }
+    padding: 12px 22px; border: 0; border-radius: 2px; background: var(--band); color: var(--ink);
+    cursor: pointer; box-shadow: 0 3px 0 var(--band-deep); }
   button:hover:not(:disabled) { filter: brightness(1.12); }
   button:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
   button:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
@@ -99,15 +99,13 @@
 
 <div class="wrap">
   <div class="board">
-    <div class="stripe"></div>
+    <div class="band"><p class="eyebrow">This department has gone</p></div>
     <div class="board-inner">
       <span class="rivet tl"></span><span class="rivet tr"></span>
       <span class="rivet bl"></span><span class="rivet br"></span>
-      <p class="eyebrow">This department has gone</p>
       <div class="ticker" id="ticker">loading</div>
-      <p class="eyebrow">without complaining</p>
     </div>
-    <div class="stripe"></div>
+    <div class="band"><p class="eyebrow">without complaining</p></div>
   </div>
   <div class="record" id="record">&nbsp;</div>
 
@@ -129,7 +127,7 @@
         <input id="imm" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minute it happened">
       </div>
       <input type="text" id="inote" placeholder="What happened (optional)" maxlength="90" autocomplete="off">
-      <button id="resetbtn" class="dark">Reset the counter</button>
+      <button id="resetbtn">Reset the counter</button>
     </div>
     <div id="resetlog"></div>
   </div>
