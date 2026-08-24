@@ -58,8 +58,6 @@
   button:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
   button:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
   button:disabled { background: var(--enamel-2); color: var(--muted); box-shadow: 0 3px 0 #E0C3A6; cursor: default; }
-  button.ghost { background: transparent; color: var(--muted); box-shadow: none; font-family: var(--body);
-    text-transform: none; letter-spacing: 0; font-size: 12px; padding: 6px 8px; text-decoration: underline; }
 
   .panel { background: var(--enamel); border: 2px solid var(--enamel-2); border-radius: 2px;
     padding: 16px 18px; margin-bottom: 12px; }
@@ -119,6 +117,7 @@
   <div class="panel">
     <h2><span>The counter</span><span id="reset-count"></span></h2>
     <div class="row">
+      <input type="date" id="idate" class="date" aria-label="Day it happened">
       <div class="clock-in">
         <input id="ihh" inputmode="numeric" maxlength="2" placeholder="HH" aria-label="Hour it happened">
         <span>:</span>
@@ -132,20 +131,9 @@
 
   <div class="panel">
     <h2><span>First complaint of the day</span><span id="count-label"></span></h2>
-    <div class="row">
-      <input type="date" id="cdate" class="date" aria-label="Day">
-      <div class="clock-in">
-        <input id="chh" inputmode="numeric" maxlength="2" placeholder="HH" aria-label="Hour of the first complaint">
-        <span>:</span>
-        <input id="cmm" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minute of the first complaint">
-      </div>
-      <input type="text" id="cnote" placeholder="What set it off (optional)" maxlength="90" autocomplete="off">
-      <button id="logbtn">Log it</button>
-    </div>
     <div class="clock-strip" id="strip"></div>
     <div id="logbody"></div>
     <div class="stats" id="stats"></div>
-    <div style="text-align:center"><button class="ghost" id="undo" hidden>Remove today's entry</button></div>
   </div>
 
   <p class="foot" id="mode"></p>
@@ -188,9 +176,6 @@ const supa = {
   async add(e, pw) {
     await supa.rpc('add_event', { p_board: CONFIG.board, p_kind: e.kind, p_day: dayKey(e.ts),
       p_ts: new Date(e.ts).toISOString(), p_note: e.note, p_secret: pw });
-  },
-  async removeComplaint(day, pw) {
-    await supa.rpc('remove_complaint', { p_board: CONFIG.board, p_day: day, p_secret: pw });
   }
 };
 
@@ -208,13 +193,7 @@ const claude = {
   async add(e, pw) {
     if (pw !== CONFIG.demoPassword) throw new Error('BADPW');
     const list = await claude.raw();
-    if (e.kind === 'complaint' && list.some(x => x.kind === 'complaint' && dayKey(x.ts) === dayKey(e.ts))) throw new Error('DUPLICATE');
     list.push(e);
-    await window.storage.set(CLAUDE_KEY, JSON.stringify({ entries: list }), true);
-  },
-  async removeComplaint(day, pw) {
-    if (pw !== CONFIG.demoPassword) throw new Error('BADPW');
-    const list = (await claude.raw()).filter(x => !(x.kind === 'complaint' && dayKey(x.ts) === day));
     await window.storage.set(CLAUDE_KEY, JSON.stringify({ entries: list }), true);
   }
 };
@@ -222,7 +201,7 @@ const claude = {
 const store = supa.available() ? supa : (claude.available() ? claude : null);
 
 /* ---------- helpers ---------- */
-let events = [], undoArmed = false, justReset = false;
+let events = [], justReset = false;
 const $ = id => document.getElementById(id);
 const dayKey = ts => { const d = new Date(ts);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
@@ -230,20 +209,21 @@ const clockOf = ts => { const d = new Date(ts);
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const minsOf = ts => { const d = new Date(ts); return d.getHours() * 60 + d.getMinutes(); };
 const fmtMins = m => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(Math.round(m) % 60).padStart(2, '0');
-const kind = k => events.filter(e => e.kind === k).sort((a, b) => a.ts - b.ts);
-const complaints = () => kind('complaint');
-const incidents = () => kind('incident');
+const incidents = () => events.filter(e => e.kind === 'incident').sort((a, b) => a.ts - b.ts);
+const dailyFirsts = () => {
+  const byDay = {};
+  events.forEach(e => { const d = dayKey(e.ts);
+    if (!byDay[d] || e.ts < byDay[d].ts) byDay[d] = e; });
+  return Object.values(byDay).sort((a, b) => a.ts - b.ts);
+};
 const pad = n => String(n).padStart(2, '0');
-const selectedDay = () => $('cdate').value || dayKey(Date.now());
-const complaintOn = day => complaints().find(e => dayKey(e.ts) === day);
 function buildTs(dateStr, timeVal) {
   const p = dateStr.split('-').map(Number), q = (timeVal || '00:00').split(':').map(Number);
   return new Date(p[0], p[1] - 1, p[2], q[0], q[1], 0, 0).getTime();
 }
 function resetFields() {
   const now = new Date();
-  $('cdate').value = dayKey(now.getTime());
-  $('chh').value = pad(now.getHours()); $('cmm').value = pad(now.getMinutes());
+  $('idate').value = dayKey(now.getTime());
   $('ihh').value = pad(now.getHours()); $('imm').value = pad(now.getMinutes());
 }
 function readClock(hId, mId) {
@@ -311,26 +291,21 @@ async function refresh() {
   try { events = await store.load(); } catch (e) { say('Cannot reach the board data. Showing the last version loaded.'); }
 }
 
-async function addEvent(k, noteField, ts) {
+async function addReset(ts) {
   const pw = password(); if (!pw || !store) return;
   if (!ts || isNaN(ts)) { say('Pick a valid time first.'); return; }
   if (ts > Date.now() + 60000) { say('That time has not happened yet.'); return; }
-  const e = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), kind: k, ts: ts, note: $(noteField).value.trim() };
+  const e = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), kind: 'incident', ts: ts, note: $('inote').value.trim() };
+  const list = incidents(), isLatest = !list.length || ts > list[list.length - 1].ts;
   try {
     await store.add(e, pw);
     try { sessionStorage.setItem('board-pw', pw); } catch (err) {}
-    $(noteField).value = '';
+    $('inote').value = '';
     resetFields();
-    if (k === 'incident') { justReset = true; setTimeout(() => { justReset = false; render(); }, 3500); }
-    say(k === 'incident' ? 'Counter reset. Back to zero.' : 'Logged.', true);
+    if (isLatest) { justReset = true; setTimeout(() => { justReset = false; render(); }, 3500); }
+    say(isLatest ? 'Counter reset. Back to zero.' : 'Logged. The counter itself did not change.', true);
   } catch (err) { handle(err); }
   await refresh(); render();
-}
-
-async function removeSelected() {
-  const pw = password(); if (!pw || !store) return;
-  try { await store.removeComplaint(selectedDay(), pw); say('Removed.', true); } catch (err) { handle(err); }
-  undoArmed = false; await refresh(); render();
 }
 
 /* ---------- render ---------- */
@@ -362,7 +337,7 @@ function renderResets() {
 }
 
 function renderStrip() {
-  const list = complaints().slice(-30), strip = $('strip');
+  const list = dailyFirsts().slice(-30), strip = $('strip');
   let A = 7, B = 19;
   list.forEach(e => { const h = minsOf(e.ts) / 60;
     A = Math.min(A, Math.floor(h)); B = Math.max(B, Math.ceil(h)); });
@@ -385,16 +360,16 @@ function renderStrip() {
 }
 
 function renderComplaints() {
-  const list = complaints().slice().reverse(), body = $('logbody');
+  const asc = dailyFirsts(), list = asc.slice().reverse(), body = $('logbody');
   $('count-label').textContent = list.length ? list.length + ' day' + (list.length === 1 ? '' : 's') : '';
-  if (!list.length) { body.innerHTML = '<p class="empty">Nothing logged yet.</p>'; $('stats').innerHTML = ''; return; }
+  if (!list.length) { body.innerHTML = '<p class="empty">Nothing logged yet. Counter resets will show up here.</p>'; $('stats').innerHTML = ''; return; }
   body.innerHTML = '<table>' + list.slice(0, 40).map(e => {
     const date = new Date(e.ts).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
     return '<tr><td class="t-date">' + date + '</td><td class="t-time">' + clockOf(e.ts) +
       '</td><td class="t-note">' + (e.note ? esc(e.note) : '') + '</td></tr>';
   }).join('') + '</table>';
 
-  const asc = complaints(), mins = asc.map(e => minsOf(e.ts));
+  const mins = asc.map(e => minsOf(e.ts));
   const avg = mins.reduce((a, b) => a + b, 0) / mins.length;
   const early = asc[mins.indexOf(Math.min.apply(null, mins))];
   const late = asc[mins.indexOf(Math.max.apply(null, mins))];
@@ -405,42 +380,21 @@ function renderComplaints() {
 }
 
 function renderControls() {
-  const day = selectedDay(), t = complaintOn(day), btn = $('logbtn');
-  btn.disabled = !!t || !store;
-  btn.textContent = t ? 'Already logged, ' + clockOf(t.ts) : 'Log it';
   $('resetbtn').disabled = !store;
-  const undo = $('undo');
-  undo.hidden = !t;
-  const label = day === dayKey(Date.now()) ? 'today\u2019s entry'
-    : 'the entry for ' + new Date(buildTs(day, '12:00')).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-  undo.textContent = undoArmed ? 'Click again to remove it' : 'Remove ' + label;
 }
 
 function render() { renderTicker(); renderResets(); renderStrip(); renderComplaints(); renderControls(); }
 
 /* ---------- wiring ---------- */
-function logComplaint() {
-  const t = readClock('chh', 'cmm');
-  if (!t) { say('Enter an hour between 00 and 23 and a minute between 00 and 59.'); $('chh').focus(); return; }
-  addEvent('complaint', 'cnote', buildTs(selectedDay(), t));
-}
 function logIncident() {
   const t = readClock('ihh', 'imm');
   if (!t) { say('Enter an hour between 00 and 23 and a minute between 00 and 59.'); $('ihh').focus(); return; }
-  addEvent('incident', 'inote', buildTs(dayKey(Date.now()), t));
+  addReset(buildTs($('idate').value || dayKey(Date.now()), t));
 }
-wireClock('chh', 'cmm', () => { if (!$('logbtn').disabled) logComplaint(); });
 wireClock('ihh', 'imm', logIncident);
 
 $('resetbtn').addEventListener('click', logIncident);
-$('logbtn').addEventListener('click', logComplaint);
-$('cnote').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('logbtn').disabled) logComplaint(); });
 $('inote').addEventListener('keydown', e => { if (e.key === 'Enter') logIncident(); });
-$('cdate').addEventListener('change', renderControls);
-$('undo').addEventListener('click', () => {
-  if (!undoArmed) { undoArmed = true; renderControls(); setTimeout(() => { undoArmed = false; renderControls(); }, 4000); }
-  else removeSelected();
-});
 
 (async function init() {
   resetFields();
