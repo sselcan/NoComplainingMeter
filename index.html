@@ -37,6 +37,8 @@
   .lock { display: flex; gap: 8px; align-items: center; justify-content: center;
     margin: 12px 0; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
   .lock input { flex: 0 1 190px; }
+  .lock .remember { display: flex; gap: 5px; align-items: center; cursor: pointer; white-space: nowrap; }
+  .lock .remember input { flex: 0 0 auto; accent-color: var(--mint); }
 
   input { font-family: var(--body); font-size: 14px; padding: 11px 12px;
     border: 2px solid var(--enamel-2); background: var(--enamel); border-radius: 2px; color: var(--ink); min-width: 0; }
@@ -110,6 +112,7 @@
   <div class="lock">
     <label for="pw">Board password</label>
     <input type="password" id="pw" placeholder="required to add anything" autocomplete="current-password">
+    <label class="remember"><input type="checkbox" id="remember"> remember on this device</label>
   </div>
 
   <p class="msg" id="msg" hidden></p>
@@ -279,8 +282,17 @@ function password() {
   if (!pw) { say('Enter the board password first.'); $('pw').focus(); return null; }
   return pw;
 }
+function savePw(pw) {
+  try {
+    sessionStorage.setItem('board-pw', pw);
+    if ($('remember').checked) localStorage.setItem('board-pw', pw);
+  } catch (err) {}
+}
 function handle(err) {
-  if (err.message === 'BADPW') { say('Wrong password. Nothing was saved.'); $('pw').value = ''; $('pw').focus(); }
+  if (err.message === 'BADPW') {
+    say('Wrong password. Nothing was saved.'); $('pw').value = ''; $('pw').focus();
+    try { localStorage.removeItem('board-pw'); sessionStorage.removeItem('board-pw'); } catch (e) {}
+  }
   else if (err.message === 'DUPLICATE') say('Today is already on the board.');
   else say('That did not save. Check your connection and try again.');
 }
@@ -299,7 +311,7 @@ async function addReset(ts) {
   const list = incidents(), isLatest = !list.length || ts > list[list.length - 1].ts;
   try {
     await store.add(e, pw);
-    try { sessionStorage.setItem('board-pw', pw); } catch (err) {}
+    savePw(pw);
     $('inote').value = '';
     resetFields();
     if (isLatest) { justReset = true; setTimeout(() => { justReset = false; render(); }, 3500); }
@@ -395,6 +407,12 @@ wireClock('ihh', 'imm', logIncident);
 
 $('resetbtn').addEventListener('click', logIncident);
 $('inote').addEventListener('keydown', e => { if (e.key === 'Enter') logIncident(); });
+$('remember').addEventListener('change', () => {
+  try {
+    if (!$('remember').checked) localStorage.removeItem('board-pw');
+    else if ($('pw').value.trim()) localStorage.setItem('board-pw', $('pw').value.trim());
+  } catch (err) {}
+});
 
 (async function init() {
   resetFields();
@@ -402,7 +420,11 @@ $('inote').addEventListener('keydown', e => { if (e.key === 'Enter') logIncident
     ? 'Anyone can watch the board. Only the password adds or removes anything. It is ' + store.label + '.'
     : 'No shared storage configured. Fill in CONFIG at the top of this file.';
   if (!store) { say('This copy is not connected to any storage, so nothing will be saved.'); render(); return; }
-  try { const pw = sessionStorage.getItem('board-pw'); if (pw) $('pw').value = pw; } catch (e) {}
+  try {
+    const kept = localStorage.getItem('board-pw');
+    if (kept) { $('pw').value = kept; $('remember').checked = true; }
+    else { const pw = sessionStorage.getItem('board-pw'); if (pw) $('pw').value = pw; }
+  } catch (e) {}
   await refresh(); render();
   setInterval(renderTicker, 1000);
   setInterval(async () => { await refresh(); render(); }, 20000);
